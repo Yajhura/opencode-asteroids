@@ -29,6 +29,7 @@ Luego visita `http://localhost:3000`.
 | `←` `→`     | Rotar nave / elegir skin      |
 | `↑`         | Propulsar                     |
 | `Espacio`   | Disparar / confirmar          |
+| `X`         | Activar/desc. escudo          |
 
 ## Skins
 
@@ -56,6 +57,8 @@ Las skins son **puramente cosméticas**: no cambian el radio de colisión, la ve
 ## Características
 
 - 3 vidas con invencibilidad temporal al reaparecer (parpadeo)
+- Escudo activable con `X`: absorbe un impacto de asteroide, gasta energía y se
+  regenera sola tras una pausa. Sin energía, el escudo se apaga y la nave queda expuesta
 - Asteroides se parten en fragmentos más pequeños al ser destruidos
 - Partículas de explosión al destruir asteroides
 - Estrella fugaz: aparece cada 9-15 s (nunca más de una a la vez), entra volando desde un borde hacia el opuesto dejando una estela de chispas, y **no se parte**. No bloquea el avance de nivel
