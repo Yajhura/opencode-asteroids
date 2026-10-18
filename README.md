@@ -43,3 +43,4 @@ Luego visita `http://localhost:3000`.
 - 3 vidas con invencibilidad temporal al reaparecer (parpadeo)
 - Asteroides se parten en fragmentos más pequeños al ser destruidos
 - Partículas de explosión al destruir asteroides
+- Power-up **Triple Shot**: cada asteroide destruido tiene una probabilidad de soltar un pickup (más probable cuanto más pequeño). Al recogerlo, durante 5 segundos cada disparo lanza 3 balas alineadas en línea recta. La cadencia de disparo no cambia y el bonus se pierde al morir o al pasar de nivel
