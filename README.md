@@ -63,3 +63,4 @@ Las skins son **puramente cosméticas**: no cambian el radio de colisión, la ve
 - Partículas de explosión al destruir asteroides
 - Estrella fugaz: aparece cada 9-15 s (nunca más de una a la vez), entra volando desde un borde hacia el opuesto dejando una estela de chispas, y **no se parte**. No bloquea el avance de nivel
 - 5 skins de nave seleccionables, recordadas entre recargas
+- Power-up **Triple Shot**: cada asteroide destruido tiene una probabilidad de soltar un pickup (más probable cuanto más pequeño). Al recogerlo, durante 5 segundos cada disparo lanza 3 balas alineadas en línea recta. La cadencia de disparo no cambia y el bonus se pierde al morir o al pasar de nivel

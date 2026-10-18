@@ -319,11 +319,12 @@ const SKINS = [
 let skinIndex = 0;
 const skin = () => SKINS[skinIndex];
 
-// Silueta de la skin escalada desde el centro, con grosor de trazo constante
-function drawSkinShape(s, scale = 1) {
+// Silueta de la skin escalada desde el centro, con grosor de trazo constante.
+// `color` permite teñir la nave sin tocar la skin (ej. triple shot activo).
+function drawSkinShape(s, scale = 1, color = s.color) {
   ctx.save();
   ctx.scale(scale, scale);
-  ctx.strokeStyle = s.color;
+  ctx.strokeStyle = color;
   ctx.lineWidth   = 1.5 / scale;
   ctx.lineJoin    = 'round';
   s.outline(ctx);
@@ -377,12 +378,13 @@ class Ship {
     this.vx     = 0;
     this.vy     = 0;
     this.radius = 12;
-    this.thrusting      = false;
+this.thrusting      = false;
     this.invincible     = 3;
     this.shootCooldown  = 0;
     this.shieldEnergy   = SHIELD_MAX;
     this.shieldActive   = false;
     this.shieldRegenDelay = 0;
+    this.tripleTimer    = 0;
     this.dead           = false;
   }
 
@@ -406,6 +408,7 @@ class Ship {
     if (this.dead) return;
     if (this.invincible    > 0) this.invincible    -= dt;
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
+    if (this.tripleTimer   > 0) this.tripleTimer   -= dt;
 
     if (this.shieldRegenDelay > 0) this.shieldRegenDelay -= dt;
     else if (this.shieldEnergy < SHIELD_MAX)
@@ -433,10 +436,14 @@ class Ship {
   tryShoot() {
     if (this.shootCooldown > 0 || this.dead) return [];
     this.shootCooldown = 0.2;
-    const nose = skin().nose;
-    const ox = this.x + Math.cos(this.angle) * nose;
-    const oy = this.y + Math.sin(this.angle) * nose;
-    return [new Bullet(ox, oy, this.angle)];
+const nose = skin().nose;
+    const dx = Math.cos(this.angle);
+    const dy = Math.sin(this.angle);
+    if (this.tripleTimer <= 0)
+      return [new Bullet(this.x + dx * nose, this.y + dy * nose, this.angle)];
+    // Triple shot: 3 balas alineadas sobre el eje de la nariz, una tras otra
+    return TRIPLE_OFFSETS.map(offset =>
+      new Bullet(this.x + dx * (nose - offset), this.y + dy * (nose - offset), this.angle));
   }
 
   draw() {
@@ -449,7 +456,9 @@ class Ship {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    drawSkinShape(s);
+// Con triple shot activo la nave se tiñe del color del power-up
+    const color = this.tripleTimer > 0 ? TRIPLE_COLOR : s.color;
+    drawSkinShape(s, 1, color);
     if (this.thrusting && Math.random() > 0.35) drawFlame(s.flame);
     ctx.restore();
 
@@ -510,8 +519,51 @@ class Particle {
   }
 }
 
+// ── Power-ups ──────────────────────────────────────────────────────────────────
+const TRIPLE_DURATION = 5;                    // segundos de triple shot
+const TRIPLE_OFFSETS  = [0, 10, 20];          // separación de las 3 balas
+const TRIPLE_COLOR    = 'rgba(120,200,255,0.95)';
+const POWERUP_TTL     = 10;                   // vida del pickup en el campo
+const POWERUP_RADIUS  = 9;
+const MAX_POWERUPS    = 2;                    // pickups simultáneos
+const DROP_CHANCE     = [0, 0.15, 0.10, 0.05]; // probabilidad por tamaño 1, 2, 3
+
+class PowerUp {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.ttl = POWERUP_TTL;
+    this.radius = 12;
+    this.dead = false;
+  }
+
+  update(dt) {
+    this.ttl -= dt;
+    if (this.ttl <= 0) this.dead = true;
+  }
+
+  draw() {
+    // Parpadeo constante para que el pickup destaque sobre los asteroides
+    if (Math.floor(this.ttl * 6) % 2 === 0) return;
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.strokeStyle = TRIPLE_COLOR;
+    ctx.lineWidth   = 1.5;
+    ctx.lineJoin    = 'round';
+    ctx.beginPath();
+    ctx.moveTo( 0,         -POWERUP_RADIUS);
+    ctx.lineTo( POWERUP_RADIUS, 0);
+    ctx.lineTo( 0,          POWERUP_RADIUS);
+    ctx.lineTo(-POWERUP_RADIUS, 0);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 // ── Estado del juego ──────────────────────────────────────────────────────────
-let ship, bullets, asteroids, particles;
+let ship, bullets, asteroids, particles, powerUps;
 let score, lives, level;
 let state;      // 'select' | 'playing' | 'dead' | 'gameover'
 let deadTimer;
@@ -567,6 +619,7 @@ function initGame() {
   bullets   = [];
   asteroids = [];
   particles = [];
+  powerUps  = [];
   score  = 0;
   lives  = 3;
   level  = 1;
@@ -585,6 +638,7 @@ function nextLevel() {
   level++;
   bullets   = [];
   particles = [];
+  powerUps  = [];
   ship.reset();
   spawnAsteroids(3 + level);
 }
@@ -593,9 +647,15 @@ function explode(x, y, count = 8) {
   for (let i = 0; i < count; i++) particles.push(new Particle(x, y));
 }
 
+function dropPowerUp(asteroid) {
+  if (powerUps.length >= MAX_POWERUPS) return;
+  if (Math.random() < DROP_CHANCE[asteroid.size]) powerUps.push(new PowerUp(asteroid.x, asteroid.y));
+}
+
 function killShip() {
   explode(ship.x, ship.y, 14);
   ship.dead = true;
+  ship.tripleTimer = 0;
   lives--;
   if (lives <= 0) {
     state = 'gameover';
@@ -643,7 +703,8 @@ function update(dt) {
   bullets.forEach(b => b.update(dt));
   asteroids.forEach(a => a.update(dt));
   particles.forEach(p => p.update(dt));
-  maybeSpawnShootingStar(dt);
+maybeSpawnShootingStar(dt);
+  powerUps.forEach(p => p.update(dt));
 
   bullets   = bullets.filter(b => !b.dead);
   particles = particles.filter(p => !p.dead);
@@ -657,12 +718,22 @@ function update(dt) {
         a.dead = true;
         score += a.points();
         explode(a.x, a.y, a.size * 5);
+        dropPowerUp(a);
         newAsteroids.push(...a.split());
       }
     }
   }
   asteroids = asteroids.filter(a => !a.dead).concat(newAsteroids);
   bullets   = bullets.filter(b => !b.dead);
+
+// Nave vs power-up
+  for (const p of powerUps) {
+    if (!p.dead && dist(ship, p) < ship.radius + p.radius) {
+      p.dead = true;
+      ship.tripleTimer = TRIPLE_DURATION;
+    }
+  }
+  powerUps = powerUps.filter(p => !p.dead);
 
   // Nave vs asteroide: el escudo activo absorbe el impacto, si no mata
   if (ship.invincible <= 0) {
@@ -709,9 +780,15 @@ function drawHUD() {
   for (let i = 0; i < lives; i++)
     drawLifeIcon(W - 16 - i * 22, 18);
 
-  // La barra solo aparece si el escudo está en uso o descargado
+// La barra solo aparece si el escudo está en uso o descargado
   if (ship.shieldActive || ship.shieldEnergy < SHIELD_MAX)
     drawShieldBar(14, 40);
+
+  if (ship.tripleTimer > 0) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = TRIPLE_COLOR;
+    ctx.fillText(`TRIPLE  ${ship.tripleTimer.toFixed(1)}s`, W / 2, H - 20);
+  }
 }
 
 function drawShieldBar(x, y) {
@@ -771,6 +848,7 @@ function draw() {
 
   particles.forEach(p => p.draw());
   asteroids.forEach(a => a.draw());
+  powerUps.forEach(p => p.draw());
   bullets.forEach(b => b.draw());
   ship.draw();
 
