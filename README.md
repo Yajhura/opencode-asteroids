@@ -24,11 +24,12 @@ Luego visita `http://localhost:3000`.
 
 ## Controles
 
-| Tecla     | Acción     |
-| --------- | ---------- |
-| `←` `→`   | Rotar nave |
-| `↑`       | Propulsar  |
-| `Espacio` | Disparar   |
+| Tecla     | Acción              |
+| --------- | ------------------- |
+| `←` `→`   | Rotar nave          |
+| `↑`       | Propulsar           |
+| `Espacio` | Disparar            |
+| `X`       | Activar/desc. escudo |
 
 ## Puntuación
 
@@ -41,5 +42,7 @@ Luego visita `http://localhost:3000`.
 ## Características
 
 - 3 vidas con invencibilidad temporal al reaparecer (parpadeo)
+- Escudo activable con `X`: absorbe un impacto de asteroide, gasta energía y se
+  regenera sola tras una pausa. Sin energía, el escudo se apaga y la nave queda expuesta
 - Asteroides se parten en fragmentos más pequeños al ser destruidos
 - Partículas de explosión al destruir asteroides

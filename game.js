@@ -119,6 +119,12 @@ class Asteroid {
 }
 
 // ── Ship ──────────────────────────────────────────────────────────────────────
+const SHIELD_MAX         = 100;
+const SHIELD_RADIUS      = 20;  // radio del anillo
+const SHIELD_DRAIN       = 45;  // energía perdida por impacto
+const SHIELD_REGEN_DELAY = 1.5; // s de espera antes de regenerar
+const SHIELD_REGEN       = 25;  // energía por segundo
+
 class Ship {
   constructor() { this.reset(); }
 
@@ -129,16 +135,39 @@ class Ship {
     this.vx     = 0;
     this.vy     = 0;
     this.radius = 12;
-    this.thrusting     = false;
-    this.invincible    = 3;
-    this.shootCooldown = 0;
-    this.dead          = false;
+    this.thrusting      = false;
+    this.invincible     = 3;
+    this.shootCooldown  = 0;
+    this.shieldEnergy   = SHIELD_MAX;
+    this.shieldActive   = false;
+    this.shieldRegenDelay = 0;
+    this.dead           = false;
+  }
+
+  toggleShield() {
+    // Solo se puede encender con energía: apagado sería un anillo inútil
+    if (!this.shieldActive && this.shieldEnergy <= 0) return;
+    this.shieldActive = !this.shieldActive;
+  }
+
+  // Consume energía al bloquear un impacto. Devuelve false si el escudo
+  // ya estaba apagado (el impacto debe matar a la nave).
+  absorb() {
+    if (!this.shieldActive) return false;
+    this.shieldEnergy = Math.max(0, this.shieldEnergy - SHIELD_DRAIN);
+    this.shieldRegenDelay = SHIELD_REGEN_DELAY;
+    if (this.shieldEnergy === 0) this.shieldActive = false;
+    return true;
   }
 
   update(dt) {
     if (this.dead) return;
     if (this.invincible    > 0) this.invincible    -= dt;
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
+
+    if (this.shieldRegenDelay > 0) this.shieldRegenDelay -= dt;
+    else if (this.shieldEnergy < SHIELD_MAX)
+      this.shieldEnergy = Math.min(SHIELD_MAX, this.shieldEnergy + SHIELD_REGEN * dt);
 
     const ROT   = 3.5;   // rad/s
     const THRUST = 260;  // px/s²
@@ -200,6 +229,23 @@ class Ship {
     }
 
     ctx.restore();
+
+    this.drawShield();
+  }
+
+  // Se dibuja aparte del parpadeo de reaparición: al reaparecer no hay escudo
+  drawShield() {
+    if (!this.shieldActive) return;
+    const ratio = this.shieldEnergy / SHIELD_MAX;
+    // Pulso de warning cuando queda poca energía
+    const pulse = ratio < 0.3 ? 0.5 + 0.5 * Math.sin(performance.now() / 60) : 1;
+    const alpha = (0.35 + 0.45 * ratio) * pulse;
+
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, SHIELD_RADIUS, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(127, 232, 255, ${alpha.toFixed(2)})`;
+    ctx.lineWidth   = 2;
+    ctx.stroke();
   }
 }
 
@@ -312,6 +358,8 @@ function update(dt) {
     bullets.push(...ship.tryShoot());
   }
 
+  if (pressed('KeyX')) ship.toggleShield();
+
   ship.update(dt);
   bullets.forEach(b => b.update(dt));
   asteroids.forEach(a => a.update(dt));
@@ -336,14 +384,22 @@ function update(dt) {
   asteroids = asteroids.filter(a => !a.dead).concat(newAsteroids);
   bullets   = bullets.filter(b => !b.dead);
 
-  // Nave vs asteroide
+  // Nave vs asteroide: el escudo activo absorbe el impacto, si no mata
   if (ship.invincible <= 0) {
     for (const a of asteroids) {
-      if (dist(ship, a) < ship.radius + a.radius * 0.82) {
+      const reach = (ship.shieldActive ? SHIELD_RADIUS : ship.radius) + a.radius * 0.82;
+      if (dist(ship, a) >= reach) continue;
+
+      if (ship.absorb()) {
+        // El escudo destruye el asteroide: sin puntos y sin fragmentos
+        a.dead = true;
+        explode(a.x, a.y, a.size * 3);
+      } else {
         killShip();
-        break;
       }
+      break;
     }
+    asteroids = asteroids.filter(a => !a.dead);
   }
 
   // Nivel completado
@@ -381,6 +437,27 @@ function drawHUD() {
   for (let i = 0; i < lives; i++)
     drawLifeIcon(W - 16 - i * 22, 18);
 
+  // La barra solo aparece si el escudo está en uso o descargado
+  if (ship.shieldActive || ship.shieldEnergy < SHIELD_MAX)
+    drawShieldBar(14, 40);
+}
+
+function drawShieldBar(x, y) {
+  const WIDTH  = 90;
+  const HEIGHT = 5;
+  const ratio  = ship.shieldEnergy / SHIELD_MAX;
+
+  ctx.font      = '11px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.fillText('ESCUDO', x, y - 6);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.lineWidth   = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, WIDTH, HEIGHT);
+
+  ctx.fillStyle = `rgba(127, 232, 255, ${ship.shieldActive ? 0.9 : 0.4})`;
+  ctx.fillRect(x + 1, y + 1, (WIDTH - 2) * ratio, HEIGHT - 2);
 }
 
 function drawOverlay(title, sub) {
