@@ -118,6 +118,137 @@ class Asteroid {
   }
 }
 
+// ── Skins ─────────────────────────────────────────────────────────────────────
+const SKIN_KEY = 'asteroids.skin';
+
+// Cada skin dibuja su silueta en espacio local: nariz hacia +x, centro en (0,0).
+// `nose` es la distancia del centro a la punta, de donde salen las balas.
+const SKINS = [
+  {
+    name: 'CLÁSICA', color: '#fff', nose: 21,
+    flame: { x: -8, half: 4, color: 'rgba(255,130,0,0.85)', min: 6, max: 14 },
+    outline(ctx) {
+      ctx.beginPath();
+      ctx.moveTo( 20,  0);
+      ctx.lineTo(-12, -9);
+      ctx.lineTo( -7,  0);
+      ctx.lineTo(-12,  9);
+      ctx.closePath();
+      ctx.stroke();
+    },
+  },
+  {
+    name: 'DELTA', color: '#5fd8ff', nose: 23,
+    flame: { x: -8, half: 6, color: 'rgba(120,220,255,0.85)', min: 6, max: 16 },
+    outline(ctx) {
+      ctx.beginPath();
+      ctx.moveTo( 22,   0);
+      ctx.lineTo( -4,  -8);
+      ctx.lineTo(-10, -20);
+      ctx.lineTo( -8,   0);
+      ctx.lineTo(-10,  20);
+      ctx.lineTo( -4,   8);
+      ctx.closePath();
+      ctx.stroke();
+    },
+  },
+  {
+    name: 'OVNI', color: '#7dff9b', nose: 19,
+    flame: { x: -16, half: 6, color: 'rgba(125,255,155,0.85)', min: 5, max: 12 },
+    outline(ctx) {
+      ctx.beginPath();
+      ctx.moveTo( 18,   0);
+      ctx.lineTo(  7,  -5);
+      ctx.lineTo(  6, -11);
+      ctx.lineTo( -6, -11);
+      ctx.lineTo( -7,  -5);
+      ctx.lineTo(-18,   0);
+      ctx.lineTo( -7,   5);
+      ctx.lineTo(  7,   5);
+      ctx.closePath();
+      ctx.stroke();
+    },
+  },
+  {
+    name: 'CAZADOR', color: '#ffb454', nose: 25,
+    flame: { x: -10, half: 5, color: 'rgba(255,180,84,0.85)', min: 7, max: 17 },
+    outline(ctx) {
+      ctx.beginPath();
+      ctx.moveTo( 24,  -7);
+      ctx.lineTo(  7,  -3);
+      ctx.lineTo(  8,   0);
+      ctx.lineTo(  7,   3);
+      ctx.lineTo( 24,   7);
+      ctx.lineTo(  2,   6);
+      ctx.lineTo(-14,  18);
+      ctx.lineTo( -6,   0);
+      ctx.lineTo(-14, -18);
+      ctx.lineTo(  2,  -6);
+      ctx.closePath();
+      ctx.stroke();
+    },
+  },
+  {
+    name: 'COMETA', color: '#ff6bd6', nose: 23,
+    flame: { x: -12, half: 4, color: 'rgba(255,107,214,0.85)', min: 6, max: 15 },
+    outline(ctx) {
+      ctx.beginPath();
+      ctx.moveTo( 22,   0);
+      ctx.lineTo(  4,  -6);
+      ctx.lineTo(-16, -10);
+      ctx.lineTo( -6,   0);
+      ctx.lineTo(-16,  10);
+      ctx.lineTo(  4,   6);
+      ctx.closePath();
+      ctx.stroke();
+    },
+  },
+];
+
+let skinIndex = 0;
+const skin = () => SKINS[skinIndex];
+
+// Silueta de la skin escalada desde el centro, con grosor de trazo constante
+function drawSkinShape(s, scale = 1) {
+  ctx.save();
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = s.color;
+  ctx.lineWidth   = 1.5 / scale;
+  ctx.lineJoin    = 'round';
+  s.outline(ctx);
+  ctx.restore();
+}
+
+// Llama del propulsor: forma compartida, posición y color por skin
+function drawFlame(flame) {
+  ctx.beginPath();
+  ctx.moveTo(flame.x, -flame.half);
+  ctx.lineTo(flame.x - rand(flame.min, flame.max), 0);
+  ctx.lineTo(flame.x, flame.half);
+  ctx.strokeStyle = flame.color;
+  ctx.stroke();
+}
+
+// El juego se abre por file://, donde el storage puede estar bloqueado
+function loadSkinIndex() {
+  try {
+    const saved = localStorage.getItem(SKIN_KEY);
+    if (saved === null) return -1;
+    const n = Number(saved);
+    return Number.isInteger(n) && n >= 0 && n < SKINS.length ? n : -1;
+  } catch {
+    return -1;
+  }
+}
+
+function saveSkinIndex() {
+  try {
+    localStorage.setItem(SKIN_KEY, String(skinIndex));
+  } catch {
+    // Sin persistencia el juego funciona igual
+  }
+}
+
 // ── Ship ──────────────────────────────────────────────────────────────────────
 class Ship {
   constructor() { this.reset(); }
@@ -162,9 +293,9 @@ class Ship {
   tryShoot() {
     if (this.shootCooldown > 0 || this.dead) return [];
     this.shootCooldown = 0.2;
-    const NOSE = 21;
-    const ox = this.x + Math.cos(this.angle) * NOSE;
-    const oy = this.y + Math.sin(this.angle) * NOSE;
+    const nose = skin().nose;
+    const ox = this.x + Math.cos(this.angle) * nose;
+    const oy = this.y + Math.sin(this.angle) * nose;
     return [new Bullet(ox, oy, this.angle)];
   }
 
@@ -173,32 +304,13 @@ class Ship {
     // Parpadeo durante invencibilidad de reaparición
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
 
+    const s = skin();
+
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth   = 1.5;
-    ctx.lineJoin    = 'round';
-
-    // Silueta clásica: triángulo con muesca trasera
-    ctx.beginPath();
-    ctx.moveTo( 20,  0);   // nariz
-    ctx.lineTo(-12, -9);   // ala izquierda
-    ctx.lineTo( -7,  0);   // muesca trasera
-    ctx.lineTo(-12,  9);   // ala derecha
-    ctx.closePath();
-    ctx.stroke();
-
-    // Llama del propulsor
-    if (this.thrusting && Math.random() > 0.35) {
-      ctx.beginPath();
-      ctx.moveTo(-8, -4);
-      ctx.lineTo(-8 - rand(6, 14), 0);
-      ctx.lineTo(-8,  4);
-      ctx.strokeStyle = 'rgba(255, 130, 0, 0.85)';
-      ctx.stroke();
-    }
-
+    drawSkinShape(s);
+    if (this.thrusting && Math.random() > 0.35) drawFlame(s.flame);
     ctx.restore();
   }
 }
@@ -238,7 +350,7 @@ class Particle {
 // ── Estado del juego ──────────────────────────────────────────────────────────
 let ship, bullets, asteroids, particles;
 let score, lives, level;
-let state;      // 'playing' | 'dead' | 'gameover'
+let state;      // 'select' | 'playing' | 'dead' | 'gameover'
 let deadTimer;
 
 function spawnAsteroids(count) {
@@ -263,6 +375,12 @@ function initGame() {
   level  = 1;
   state  = 'playing';
   spawnAsteroids(4);
+}
+
+function startGame() {
+  if (state !== 'select') return;   // evita una segunda llamada en el mismo frame
+  saveSkinIndex();
+  initGame();
 }
 
 function nextLevel() {
@@ -291,6 +409,14 @@ function killShip() {
 
 // ── Update ────────────────────────────────────────────────────────────────────
 function update(dt) {
+  if (state === 'select') {
+    if (pressed('ArrowLeft'))  skinIndex = wrap(skinIndex - 1, SKINS.length);
+    if (pressed('ArrowRight')) skinIndex = wrap(skinIndex + 1, SKINS.length);
+    if (pressed('Space'))      startGame();
+    if (pressed('Enter'))      startGame();
+    return;
+  }
+
   if (state === 'gameover') {
     if (pressed('Space')) initGame();
     particles.forEach(p => p.update(dt));
@@ -355,16 +481,7 @@ function drawLifeIcon(x, y) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 2);
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth   = 1.2;
-  ctx.lineJoin    = 'round';
-  ctx.beginPath();
-  ctx.moveTo( 9,  0);
-  ctx.lineTo(-6, -5);
-  ctx.lineTo(-3,  0);
-  ctx.lineTo(-6,  5);
-  ctx.closePath();
-  ctx.stroke();
+  drawSkinShape(skin(), 0.45);
   ctx.restore();
 }
 
@@ -393,9 +510,32 @@ function drawOverlay(title, sub) {
   ctx.fillText(sub, W / 2, H / 2 + 22);
 }
 
+function drawSkinSelect() {
+  const s = skin();
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = s.color;
+  ctx.font      = 'bold 26px monospace';
+  ctx.fillText(s.name, W / 2, 130);
+
+  ctx.save();
+  ctx.translate(W / 2, H / 2 - 20);
+  drawSkinShape(s, 4);
+  ctx.restore();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.font      = '18px monospace';
+  ctx.fillText('← →  ELEGIR NAVE      ESPACIO  JUGAR', W / 2, H - 70);
+}
+
 function draw() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, W, H);
+
+  if (state === 'select') {
+    drawSkinSelect();
+    return;
+  }
 
   particles.forEach(p => p.draw());
   asteroids.forEach(a => a.draw());
@@ -419,5 +559,13 @@ function loop(ts) {
   requestAnimationFrame(loop);
 }
 
-initGame();
+// ── Arranque ──────────────────────────────────────────────────────────────────
+skinIndex = loadSkinIndex();
+if (skinIndex >= 0) {
+  initGame();
+} else {
+  skinIndex = 0;
+  state    = 'select';
+}
+
 requestAnimationFrame(loop);

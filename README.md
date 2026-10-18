@@ -24,11 +24,25 @@ Luego visita `http://localhost:3000`.
 
 ## Controles
 
-| Tecla     | Acción     |
-| --------- | ---------- |
-| `←` `→`   | Rotar nave |
-| `↑`       | Propulsar  |
-| `Espacio` | Disparar   |
+| Tecla       | Acción                        |
+| ----------- | ----------------------------- |
+| `←` `→`     | Rotar nave / elegir skin      |
+| `↑`         | Propulsar                     |
+| `Espacio`   | Disparar / confirmar          |
+
+## Skins
+
+Al abrir el juego por primera vez aparece la pantalla de selección. `←` `→` recorren las naves y `Espacio` (o `Enter`) arranca la partida. La skin elegida se recuerda entre recargas.
+
+| Nave      | Color  |
+| --------- | ------ |
+| CLÁSICA   | Blanco |
+| DELTA     | Cian   |
+| OVNI      | Verde  |
+| CAZADOR   | Ámbar  |
+| COMETA    | Magenta|
+
+Las skins son **puramente cosméticas**: no cambian el radio de colisión, la velocidad ni el daño. Los iconos de vida del HUD usan la nave elegida.
 
 ## Puntuación
 
@@ -43,3 +57,4 @@ Luego visita `http://localhost:3000`.
 - 3 vidas con invencibilidad temporal al reaparecer (parpadeo)
 - Asteroides se parten en fragmentos más pequeños al ser destruidos
 - Partículas de explosión al destruir asteroides
+- 5 skins de nave seleccionables, recordadas entre recargas
